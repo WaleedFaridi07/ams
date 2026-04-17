@@ -34,7 +34,13 @@ npm ci
 
 2) Configure environment
 
-- Copy your local settings into `.env` (not committed)
+- Copy template and fill values:
+
+```bash
+cp .env.example .env
+```
+
+- Update `.env` with local/secret values (not committed)
 - Required for full features:
   - `DATABASE_URL`
   - `OPENAI_API_KEY`
