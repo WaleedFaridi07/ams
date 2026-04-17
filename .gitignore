@@ -32,9 +32,14 @@ pnpm-debug.log*
 
 # OS/editor junk
 .DS_Store
+._*
+Thumbs.db
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # Data generated at runtime
 data/uploads/
-openspec/report.html
+openspec/
