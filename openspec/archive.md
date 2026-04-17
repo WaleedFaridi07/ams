@@ -210,3 +210,17 @@ Completed changes are moved here for traceability.
     - Added clear control, filtered result count, and no-match empty-state message
     - Added `/` keyboard shortcut to focus search input when not typing in a form field
     - Kept responsive hero layout intact while introducing search controls
+
+- id: CHG-021
+  title: Upgrade RAG quality with real embeddings and gated rollout
+  status: archived
+  phase: Phase 13 - RAG Quality Upgrade
+  completedAt: 2026-04-17
+  notes:
+    - Added shared embedding service (`apps/api/src/embedding.ts`) for ingest/query embeddings
+    - Switched file indexing and query retrieval to real embeddings with deterministic fallback
+    - Added reindex utility `npm run rag:reindex` for existing chunk backfill
+    - Added configurable chunking (`RAG_CHUNK_SIZE`, `RAG_CHUNK_OVERLAP`)
+    - Added retrieval tuning (`RAG_TOP_K`, optional `RAG_MIN_SIMILARITY`)
+    - Tightened `knowledgeOnly` grounding and lightweight citation guidance in prompts
+    - Updated docs/env templates for RAG rollout, tuning, and reindex operations

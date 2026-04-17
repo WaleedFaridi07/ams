@@ -1,9 +1,17 @@
 :root {
-  --bg: #f2efe7;
-  --ink: #163141;
-  --muted: #4f6a79;
-  --line: #c7d6de;
-  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --surface-soft: #f7f9fc;
+  --surface-strong: #e4eaf2;
+  --ink: #0f2d46;
+  --muted: #4c6276;
+  --line: #c6d0dc;
+  --accent: #0f4c81;
+  --accent-strong: #0a365d;
+  --accent-soft: #d9e7f5;
+  --success: #1f6d46;
+  --error: #8f2f2f;
+  font-family: "Segoe UI", "Helvetica Neue", "Arial", sans-serif;
   line-height: 1.45;
   font-weight: 400;
   color: var(--muted);
@@ -21,25 +29,28 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 2% 0%, rgba(252, 216, 163, 0.45), transparent 36%),
-    radial-gradient(circle at 90% 10%, rgba(157, 208, 238, 0.32), transparent 35%),
-    linear-gradient(180deg, #f2efe7 0%, #ebe8df 100%);
+    radial-gradient(circle at 0% 0%, rgba(15, 76, 129, 0.12), transparent 34%),
+    radial-gradient(circle at 92% 8%, rgba(20, 38, 56, 0.08), transparent 30%),
+    linear-gradient(180deg, #edf2f7 0%, #e5ebf2 100%);
 }
 
 h1,
 h2 {
   margin: 0;
   color: var(--ink);
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: "Segoe UI", "Helvetica Neue", "Arial", sans-serif;
+  letter-spacing: 0.01em;
 }
 
 h1 {
   margin-bottom: 8px;
   font-size: clamp(1.8rem, 3.8vw, 2.7rem);
+  font-weight: 700;
 }
 
 h2 {
   font-size: clamp(1.05rem, 2.2vw, 1.4rem);
+  font-weight: 650;
 }
 
 p {

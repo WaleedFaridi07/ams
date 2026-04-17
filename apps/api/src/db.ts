@@ -24,6 +24,8 @@ export type ChunkRecord = {
   agentId: string;
   text: string;
   embedding: number[];
+  distance?: number;
+  similarity?: number;
 };
 
 export type AgentChildSummary = {
@@ -80,6 +82,11 @@ function mapChunkRow(row: any): ChunkRecord {
     agentId: row.agent_id,
     text: row.text,
     embedding,
+    distance: row.distance === undefined || row.distance === null ? undefined : Number(row.distance),
+    similarity:
+      row.distance === undefined || row.distance === null
+        ? undefined
+        : Number((1 - Number(row.distance)).toFixed(6)),
   };
 }
 
@@ -339,10 +346,10 @@ export async function insertChunks(agentId: string, values: Array<{ text: string
 export async function retrieveTopChunks(agentId: string, embedding: number[], topK: number): Promise<ChunkRecord[]> {
   const result = await getPool().query(
     `
-      SELECT *
+      SELECT *, (embedding <=> $2::vector) AS distance
       FROM chunks
       WHERE agent_id = $1
-      ORDER BY embedding <=> $2::vector
+      ORDER BY distance
       LIMIT $3
     `,
     [agentId, toVectorLiteral(embedding), topK]

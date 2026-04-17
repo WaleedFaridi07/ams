@@ -5,7 +5,8 @@
     "openspec:review": "node scripts/review-openspec-report.mjs",
     "openspec:review:open": "node scripts/review-openspec-report.mjs && open openspec/report.html",
     "cleanup:fresh": "bash scripts/cleanup-fresh.sh --yes",
-    "cleanup:fresh:hard": "bash scripts/cleanup-fresh.sh --wipe-volume --yes"
+    "cleanup:fresh:hard": "bash scripts/cleanup-fresh.sh --wipe-volume --yes",
+    "rag:reindex": "node scripts/reindex-embeddings.mjs"
   },
   "workspaces": [
     "apps/*",

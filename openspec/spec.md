@@ -182,6 +182,18 @@ Chunks:
 - [x] Add `/` keyboard shortcut to focus search input
 - [x] Preserve responsive layout behavior across desktop and mobile
 
+### Phase 13 — RAG Quality Upgrade
+- [x] Add real embedding service abstraction for ingest/query
+- [x] Replace mock embeddings in file indexing pipeline
+- [x] Replace mock query embeddings in retrieval pipeline
+- [x] Add reindex script for existing chunk vectors
+- [x] Add configurable chunk size and overlap strategy
+- [x] Add configurable retrieval defaults (`RAG_TOP_K`)
+- [x] Add optional weak-match guard (`RAG_MIN_SIMILARITY`)
+- [x] Tighten `knowledgeOnly` grounding prompt behavior
+- [x] Add optional lightweight chunk reference markers in responses
+- [x] Add config + docs for phased RAG rollout and evaluation
+
 ---
 
 ## 4. Implementation Notes

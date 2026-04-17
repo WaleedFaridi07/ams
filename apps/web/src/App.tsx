@@ -148,6 +148,7 @@ function App() {
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([])
   const [isChatting, setIsChatting] = useState(false)
   const [feedbackLoadingIds, setFeedbackLoadingIds] = useState<string[]>([])
+  const chatLogRef = useRef<HTMLDivElement | null>(null)
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -231,6 +232,23 @@ function App() {
     const next = `${url.pathname}${url.search}${url.hash}`
     window.history.replaceState({}, '', next)
   }, [searchTerm])
+
+  useEffect(() => {
+    if (!chatAgent) {
+      return
+    }
+
+    const node = chatLogRef.current
+    if (!node) {
+      return
+    }
+
+    const id = window.requestAnimationFrame(() => {
+      node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' })
+    })
+
+    return () => window.cancelAnimationFrame(id)
+  }, [chatAgent, chatHistory, isChatting])
 
   useEffect(() => {
     function isTypingElement(target: EventTarget | null): boolean {
@@ -522,7 +540,6 @@ function App() {
         addToast('error', `Child delegation failed: ${data.delegation.error ?? 'unknown error'}`)
       }
 
-      addToast('success', 'Agent response ready')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Chat failed'
       addToast('error', message)
@@ -956,53 +973,65 @@ function App() {
               </span>
             </label>
 
-            <div className="chat-log">
+            <div className="chat-log" ref={chatLogRef}>
               {chatHistory.length === 0 ? (
                 <p className="hint">Start by asking a question.</p>
               ) : (
-                chatHistory.map((turn) => (
-                  <article className={`chat-bubble ${turn.role}`} key={turn.id}>
-                    <p>{turn.text}</p>
-                    {turn.meta && <small>{turn.meta}</small>}
-                    {turn.role === 'assistant' && (
-                      <div className="feedback-row">
-                        <button
-                          type="button"
-                          className="feedback-btn"
-                          disabled={
-                            !turn.traceId ||
-                            Boolean(turn.feedbackSubmitted) ||
-                            feedbackLoadingIds.includes(turn.id)
-                          }
-                          onClick={() => {
-                            submitChatFeedback(turn.id, 1).catch(() => {
-                              /* handled in function */
-                            })
-                          }}
-                        >
-                          👍
-                        </button>
-                        <button
-                          type="button"
-                          className="feedback-btn"
-                          disabled={
-                            !turn.traceId ||
-                            Boolean(turn.feedbackSubmitted) ||
-                            feedbackLoadingIds.includes(turn.id)
-                          }
-                          onClick={() => {
-                            submitChatFeedback(turn.id, 0).catch(() => {
-                              /* handled in function */
-                            })
-                          }}
-                        >
-                          👎
-                        </button>
-                        {turn.feedbackSubmitted && <small className="feedback-saved">feedback saved</small>}
+                <>
+                  {chatHistory.map((turn) => (
+                    <article className={`chat-bubble ${turn.role}`} key={turn.id}>
+                      <p>{turn.text}</p>
+                      {turn.meta && <small>{turn.meta}</small>}
+                      {turn.role === 'assistant' && (
+                        <div className="feedback-row">
+                          <button
+                            type="button"
+                            className="feedback-btn"
+                            disabled={
+                              !turn.traceId ||
+                              Boolean(turn.feedbackSubmitted) ||
+                              feedbackLoadingIds.includes(turn.id)
+                            }
+                            onClick={() => {
+                              submitChatFeedback(turn.id, 1).catch(() => {
+                                /* handled in function */
+                              })
+                            }}
+                          >
+                            👍
+                          </button>
+                          <button
+                            type="button"
+                            className="feedback-btn"
+                            disabled={
+                              !turn.traceId ||
+                              Boolean(turn.feedbackSubmitted) ||
+                              feedbackLoadingIds.includes(turn.id)
+                            }
+                            onClick={() => {
+                              submitChatFeedback(turn.id, 0).catch(() => {
+                                /* handled in function */
+                              })
+                            }}
+                          >
+                            👎
+                          </button>
+                          {turn.feedbackSubmitted && <small className="feedback-saved">feedback saved</small>}
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                  {isChatting && (
+                    <article className="chat-bubble assistant working">
+                      <p className="working-label">Thinking...</p>
+                      <div className="working-dots" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
                       </div>
-                    )}
-                  </article>
-                ))
+                    </article>
+                  )}
+                </>
               )}
             </div>
 

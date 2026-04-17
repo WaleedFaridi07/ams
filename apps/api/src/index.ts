@@ -24,6 +24,7 @@ import {
   type ChunkRecord,
   updateAgentKnowledge,
 } from "./db";
+import { embedBatch, embedText, getEmbeddingConfigSummary } from "./embedding";
 
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
@@ -141,7 +142,7 @@ const skillSchema = z.object({
 
 const chunksQuerySchema = z.object({
   q: z.string().optional().default(""),
-  k: z.coerce.number().int().positive().max(10).optional().default(3),
+  k: z.coerce.number().int().positive().max(10).optional().default(4),
 });
 
 const weatherQuerySchema = z.object({
@@ -249,6 +250,13 @@ const configuredApiKey = process.env.API_ACCESS_KEY?.trim();
 const demoMcpSharedSecret = (process.env.DEMO_MCP_SHARED_SECRET ?? "demo-mcp-secret").trim();
 const enableChildOrchestration = process.env.ENABLE_CHILD_ORCHESTRATION !== "false";
 const childRoutingMode = (process.env.CHILD_ROUTING_MODE ?? "llm_strict").trim().toLowerCase();
+const ragTopKDefault = Math.max(1, Number(process.env.RAG_TOP_K ?? 4));
+const ragMinSimilarity =
+  process.env.RAG_MIN_SIMILARITY === undefined
+    ? null
+    : Number(process.env.RAG_MIN_SIMILARITY);
+const ragChunkSize = Math.max(200, Number(process.env.RAG_CHUNK_SIZE ?? 500));
+const ragChunkOverlap = Math.max(0, Number(process.env.RAG_CHUNK_OVERLAP ?? 100));
 const enableLlmJudge = process.env.ENABLE_LLM_JUDGE === "true";
 const llmJudgeModel = process.env.LLM_JUDGE_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 const llmJudgeTimeoutMs = Number(process.env.LLM_JUDGE_TIMEOUT_MS ?? 8000);
@@ -256,6 +264,8 @@ const llmJudgeConcurrency = Math.max(1, Number(process.env.LLM_JUDGE_CONCURRENCY
 const llmJudgeMaxQueue = Math.max(10, Number(process.env.LLM_JUDGE_MAX_QUEUE ?? 200));
 const judgeQueue: JudgeJob[] = [];
 let judgeRunningWorkers = 0;
+
+const embeddingConfig = getEmbeddingConfigSummary();
 
 app.use(
   rateLimit({
@@ -1341,8 +1351,9 @@ async function buildLangChainReply(
         ? "Internet browsing is allowed if needed."
         : "Internet browsing is disabled. Do not use external sources.",
       agent.knowledgeOnly
-        ? "Use only the retrieved context for factual answers. If missing, state that attached files do not provide enough information."
+        ? "Use only the retrieved context for factual answers. If context is missing or weak, say that attached files do not provide enough information. Do not guess."
         : "Retrieved context is optional support.",
+      "When referencing retrieved context, cite short markers like [1], [2] where relevant.",
       "Use the following retrieved context if relevant:",
       contextText,
     ].join("\n\n"),
@@ -1417,7 +1428,7 @@ async function persistKnowledgeFiles(
   }>
 ): Promise<{ storedFiles: string[]; createdChunks: Chunk[] }> {
   const storedFiles: string[] = [];
-  const chunkPayloads: Array<{ text: string; embedding: number[] }> = [];
+  const textsToEmbed: string[] = [];
 
   await mkdir(uploadsDir, { recursive: true });
 
@@ -1438,11 +1449,8 @@ async function persistKnowledgeFiles(
     await writeFile(filePath, extractedText, "utf8");
     storedFiles.push(filePath);
 
-    const textChunks = chunkText(extractedText);
-
-    for (const text of textChunks) {
-      chunkPayloads.push({ text, embedding: createMockEmbedding(text) });
-    }
+    const textChunks = chunkText(extractedText, ragChunkSize, ragChunkOverlap);
+    textsToEmbed.push(...textChunks);
   }
 
   if (!storedFiles.length) {
@@ -1452,19 +1460,28 @@ async function persistKnowledgeFiles(
     );
   }
 
+  const embeddings = textsToEmbed.length ? await embedBatch(textsToEmbed) : [];
+  const chunkPayloads = textsToEmbed.map((text, index) => ({
+    text,
+    embedding: embeddings[index] ?? createMockEmbedding(text),
+  }));
   const createdChunks = chunkPayloads.length ? await insertChunks(agentId, chunkPayloads) : [];
   return { storedFiles, createdChunks };
 }
 
-function chunkText(text: string, size = 500): string[] {
+function chunkText(text: string, size = 500, overlap = 100): string[] {
   if (text.length <= size) {
     return [text];
   }
 
   const output: string[] = [];
+  const step = Math.max(1, size - Math.max(0, Math.min(overlap, size - 1)));
 
-  for (let index = 0; index < text.length; index += size) {
+  for (let index = 0; index < text.length; index += step) {
     output.push(text.slice(index, index + size));
+    if (index + size >= text.length) {
+      break;
+    }
   }
 
   return output;
@@ -1488,8 +1505,14 @@ function createMockEmbedding(text: string): number[] {
 }
 
 async function retrieveTopChunks(agentId: string, query: string, topK: number): Promise<Chunk[]> {
-  const queryEmbedding = createMockEmbedding(query);
-  return retrieveTopChunksByVector(agentId, queryEmbedding, topK);
+  const queryEmbedding = await embedText(query);
+  const chunks = await retrieveTopChunksByVector(agentId, queryEmbedding, topK);
+
+  if (ragMinSimilarity !== null && Number.isFinite(ragMinSimilarity)) {
+    return chunks.filter((chunk) => (chunk.similarity ?? -1) >= Number(ragMinSimilarity));
+  }
+
+  return chunks;
 }
 
 app.get("/health", (req, res) => {
@@ -1719,7 +1742,7 @@ app.post(
     const agent = await enrichAgent(agentRecord);
 
     const useKnowledge = agent.knowledgeOnly ? true : payload.useKnowledge ?? agent.hasKnowledge;
-    const topK = payload.topK ?? 3;
+    const topK = payload.topK ?? ragTopKDefault;
     const userMessage = payload.message;
     const orchestrated = await orchestrateParentTurn({
       parentAgentRecord: agentRecord,
@@ -2004,6 +2027,10 @@ const port = Number(process.env.PORT ?? 3001);
 
 async function startServer(): Promise<void> {
   await initDatabase();
+
+  console.log(
+    `Embeddings: provider=${embeddingConfig.provider} model=${embeddingConfig.model} dim=${embeddingConfig.dimensions} fallback=${embeddingConfig.usingFallback}`
+  );
 
   app.listen(port, () => {
     console.log(`API running on http://localhost:${port}`);
